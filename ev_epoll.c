@@ -69,7 +69,7 @@
 
 static void
 epoll_modify (EV_P_ int fd, int oev, int nev)
-{
+{//调用epoll_ctl将事件加入到EPOLL里面去
   struct epoll_event ev;
   unsigned char oldmask;
 
@@ -208,6 +208,7 @@ epoll_poll (EV_P_ ev_tstamp timeout)
             }
         }
 
+	  //这里面实际上是解析事件的类型，然后放到pendings的优先级队列里面，这样到后面再慢慢处理
       fd_event (EV_A_ fd, got);
     }
 
@@ -234,7 +235,7 @@ epoll_poll (EV_P_ ev_tstamp timeout)
 
 int inline_size
 epoll_init (EV_P_ int flags)
-{
+{// epoll_create然后复制相关的backend_poll等。准备epoll_events数组用来接收事件
 #ifdef EPOLL_CLOEXEC
   backend_fd = epoll_create1 (EPOLL_CLOEXEC);
 
@@ -245,12 +246,15 @@ epoll_init (EV_P_ int flags)
   if (backend_fd < 0)
     return 0;
 
+  //close on exec, not on-fork, 意为如果对描述符设置了FD_CLOEXEC，使用execl执行的程序里，此描述符被关闭，i
+  //不能再使用它，但是在使用fork调用的子进程中，此描述符并不关闭，仍可使用
   fcntl (backend_fd, F_SETFD, FD_CLOEXEC);
 
   backend_mintime = 1e-3; /* epoll does sometimes return early, this is just to avoid the worst */
-  backend_modify  = epoll_modify;
-  backend_poll    = epoll_poll;
+  backend_modify  = epoll_modify;//修改函数
+  backend_poll    = epoll_poll;//进行wait等待事件的函数
 
+  //下面准备用来接收变化事件的数组，最多一次支持64个句柄可读返回
   epoll_eventmax = 64; /* initial number of events receivable per poll */
   epoll_events = (struct epoll_event *)ev_malloc (sizeof (struct epoll_event) * epoll_eventmax);
 

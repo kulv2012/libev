@@ -1502,7 +1502,7 @@ ev_realloc (void *ptr, long size)
 /* file descriptor info structure */
 typedef struct
 {
-  WL head;
+  WL head;//事件列表
   unsigned char events; /* the events watched for */
   unsigned char reify;  /* flag set when this ANFD needs reification (EV_ANFD_REIFY, EV__IOFDSET) */
   unsigned char emask;  /* the epoll backend stores the actual kernel mask in here */
@@ -1728,7 +1728,7 @@ pendingcb (EV_P_ ev_prepare *w, int revents)
 
 void noinline
 ev_feed_event (EV_P_ void *w, int revents) EV_THROW
-{
+{//喂养事件，实际上就是将事件放到(loop)->pendings的数组里面，然后后面会一个个按照优先级去处理的
   W w_ = (W)w;
   int pri = ABSPRI (w_);
 
@@ -1773,12 +1773,12 @@ queue_events (EV_P_ W *events, int eventcnt, int type)
 
 inline_speed void
 fd_event_nocheck (EV_P_ int fd, int revents)
-{
+{//对一个SOCK进行检查，看他是不是想要revents的事件，如果想要，那么将其加入到pengdings优先级队列里面，以备后续处理
   ANFD *anfd = anfds + fd;
   ev_io *w;
 
   for (w = (ev_io *)anfd->head; w; w = (ev_io *)((WL)w)->next)
-    {
+    {//看到了吧，anfd的head链表实际上就是一个个事件，比如可读，可写分别为2个事件，发生事件时会扫描这里，去寻找需要的事件，然后处理
       int ev = w->events & revents;
 
       if (ev)
@@ -1808,37 +1808,12 @@ ev_feed_fd_event (EV_P_ int fd, int revents) EV_THROW
 /* with the kernel/libev internal state */
 inline_size void
 fd_reify (EV_P)
-{
+{//将fdchanges里面在ev_io_start里面设置记录的这些新事件一个个处理，真正加入epoll里面.所谓的reify具体化
   int i;
 
-#if EV_SELECT_IS_WINSOCKET || EV_USE_IOCP
   for (i = 0; i < fdchangecnt; ++i)
     {
-      int fd = fdchanges [i];
-      ANFD *anfd = anfds + fd;
-
-      if (anfd->reify & EV__IOFDSET && anfd->head)
-        {
-          SOCKET handle = EV_FD_TO_WIN32_HANDLE (fd);
-
-          if (handle != anfd->handle)
-            {
-              unsigned long arg;
-
-              assert (("libev: only socket fds supported in this configuration", ioctlsocket (handle, FIONREAD, &arg) == 0));
-
-              /* handle changed, but fd didn't - we need to do it in two steps */
-              backend_modify (EV_A_ fd, anfd->events, 0);
-              anfd->events = 0;
-              anfd->handle = handle;
-            }
-        }
-    }
-#endif
-
-  for (i = 0; i < fdchangecnt; ++i)
-    {
-      int fd = fdchanges [i];
+      int fd = fdchanges [i];//只需要获取里面的fd，然后就可以在anfds里面索引描述符数据的位置了
       ANFD *anfd = anfds + fd;
       ev_io *w;
 
@@ -1851,6 +1826,7 @@ fd_reify (EV_P)
         {
           anfd->events = 0;
 
+		  //尝试一个个事件的去处理，看起来不能支持减少字段似得
           for (w = (ev_io *)anfd->head; w; w = (ev_io *)((WL)w)->next)
             anfd->events |= (unsigned char)w->events;
 
@@ -1858,6 +1834,7 @@ fd_reify (EV_P)
             o_reify = EV__IOFDSET; /* actually |= */
         }
 
+		//下面调用的其实是epoll_modify, 后者根据具体情况调用epoll_ctl函数，将新事件设置到epoll里面去 ,或者减少
       if (o_reify & EV__IOFDSET)
         backend_modify (EV_A_ fd, o_events, anfd->events);
     }
@@ -1868,7 +1845,7 @@ fd_reify (EV_P)
 /* something about the given fd changed */
 inline_size void
 fd_change (EV_P_ int fd, int flags)
-{
+{//标记这个句柄的改动到fdchanges，后面run的时候会处理加入epoll的
   unsigned char reify = anfds [fd].reify;
   anfds [fd].reify |= flags;
 
@@ -1876,7 +1853,8 @@ fd_change (EV_P_ int fd, int flags)
     {
       ++fdchangecnt;
       array_needsize (int, fdchanges, fdchangemax, fdchangecnt, EMPTY2);
-      fdchanges [fdchangecnt - 1] = fd;
+      fdchanges [fdchangecnt - 1] = fd;//因为这里根本没有将句柄加入epoll， 而是将这个有改动事件的事情记录
+	  //到ev_loop->fdchangeslim .意思是说：这个fdchanges数组里面的句柄都有新的事件加入或者删除，待会需要调用epoll_ctl来注册。
     }
 }
 
@@ -2554,7 +2532,7 @@ ev_set_loop_release_cb (EV_P_ ev_loop_callback_nothrow release, ev_loop_callback
 /* initialise a loop structure, must be zero-initialised */
 static void noinline ecb_cold
 loop_init (EV_P_ unsigned int flags) EV_THROW
-{
+{//调用epoll_create创建epoll句柄
   if (!backend)
     {
       origflags = flags;
@@ -2595,7 +2573,7 @@ loop_init (EV_P_ unsigned int flags) EV_THROW
       now_floor          = mn_now;
       rtmn_diff          = ev_rt_now - mn_now;
 #if EV_FEATURE_API
-      invoke_cb          = ev_invoke_pending;
+      invoke_cb          = ev_invoke_pending;//这个就是触发回调函数的函数,在ev_loop里面调用
 #endif
 
       io_blocktime       = 0.;
@@ -2620,31 +2598,14 @@ loop_init (EV_P_ unsigned int flags) EV_THROW
       if (!(flags & EVBACKEND_MASK))
         flags |= ev_recommended_backends ();
 
-#if EV_USE_IOCP
-      if (!backend && (flags & EVBACKEND_IOCP  )) backend = iocp_init   (EV_A_ flags);
-#endif
-#if EV_USE_PORT
-      if (!backend && (flags & EVBACKEND_PORT  )) backend = port_init   (EV_A_ flags);
-#endif
-#if EV_USE_KQUEUE
-      if (!backend && (flags & EVBACKEND_KQUEUE)) backend = kqueue_init (EV_A_ flags);
-#endif
-#if EV_USE_EPOLL
+	  //里面调用epoll_create初始化epoll
       if (!backend && (flags & EVBACKEND_EPOLL )) backend = epoll_init  (EV_A_ flags);
-#endif
-#if EV_USE_POLL
-      if (!backend && (flags & EVBACKEND_POLL  )) backend = poll_init   (EV_A_ flags);
-#endif
-#if EV_USE_SELECT
-      if (!backend && (flags & EVBACKEND_SELECT)) backend = select_init (EV_A_ flags);
-#endif
 
       ev_prepare_init (&pending_w, pendingcb);
 
-#if EV_SIGNAL_ENABLE || EV_ASYNC_ENABLE
+	  //初始化管道相关的回调
       ev_init (&pipe_w, pipecb);
       ev_set_priority (&pipe_w, EV_MAXPRI);
-#endif
     }
 }
 
@@ -2699,25 +2660,7 @@ ev_loop_destroy (EV_P)
   if (backend_fd >= 0)
     close (backend_fd);
 
-#if EV_USE_IOCP
-  if (backend == EVBACKEND_IOCP  ) iocp_destroy   (EV_A);
-#endif
-#if EV_USE_PORT
-  if (backend == EVBACKEND_PORT  ) port_destroy   (EV_A);
-#endif
-#if EV_USE_KQUEUE
-  if (backend == EVBACKEND_KQUEUE) kqueue_destroy (EV_A);
-#endif
-#if EV_USE_EPOLL
   if (backend == EVBACKEND_EPOLL ) epoll_destroy  (EV_A);
-#endif
-#if EV_USE_POLL
-  if (backend == EVBACKEND_POLL  ) poll_destroy   (EV_A);
-#endif
-#if EV_USE_SELECT
-  if (backend == EVBACKEND_SELECT) select_destroy (EV_A);
-#endif
-
   for (i = NUMPRI; i--; )
     {
       array_free (pending, [i]);
@@ -2947,7 +2890,7 @@ struct ev_loop * ecb_cold
 int
 #endif
 ev_default_loop (unsigned int flags) EV_THROW
-{
+{//loop_init->epoll_create初始化
   if (!ev_default_loop_ptr)
     {
 #if EV_MULTIPLICITY
@@ -2956,7 +2899,7 @@ ev_default_loop (unsigned int flags) EV_THROW
       ev_default_loop_ptr = 1;
 #endif
 
-      loop_init (EV_A_ flags);
+      loop_init (EV_A_ flags);//创建epoll句柄等 
 
       if (ev_backend (EV_A))
         {
@@ -3002,7 +2945,7 @@ ev_pending_count (EV_P) EV_THROW
 
 void noinline
 ev_invoke_pending (EV_P)
-{
+{//触发在epoll_wait后加入到pendings优先级队列里面的事件，一个个一次调用他们的cb回调函数
   pendingpri = NUMPRI;
 
   while (pendingpri) /* pendingpri possibly gets modified in the inner loop */
@@ -3014,7 +2957,7 @@ ev_invoke_pending (EV_P)
           ANPENDING *p = pendings [pendingpri] + --pendingcnt [pendingpri];
 
           p->w->pending = 0;
-          EV_CB_INVOKE (p->w, p->events);
+          EV_CB_INVOKE (p->w, p->events);//调用回调函数
           EV_FREQUENT_CHECK;
         }
     }
@@ -3315,7 +3258,7 @@ ev_run (EV_P_ int flags)
         loop_fork (EV_A);
 
       /* update fd-related kernel structures */
-      fd_reify (EV_A);
+      fd_reify (EV_A);//这个函数是将ev_io_start开启的事件记录的fdchanges列表设置到epoll句柄监听事件集里面去
 
       /* calculate blocking time */
       {
@@ -3380,7 +3323,8 @@ ev_run (EV_P_ int flags)
         ++loop_count;
 #endif
         assert ((loop_done = EVBREAK_RECURSE, 1)); /* assert for side effect */
-        backend_poll (EV_A_ waittime);
+		//这里虽然waite了，而且解析读写事件类型了，但是还没有调用那些处理函数的，只是将他们挂入了pendings 的优先级队列
+        backend_poll (EV_A_ waittime);//实际上调用的是epoll_poll等待监听事件可读可写
         assert ((loop_done = EVBREAK_CANCEL, 1)); /* assert for side effect */
 
         pipe_write_wanted = 0; /* just an optimisation, no fence needed */
@@ -3414,7 +3358,8 @@ ev_run (EV_P_ int flags)
         queue_events (EV_A_ (W *)checks, checkcnt, EV_CHECK);
 #endif
 
-      EV_INVOKE_PENDING;
+      EV_INVOKE_PENDING;// FUCK， 又用宏，实际上就是调用了ev_invoke_pending函数，一个个将上面backend_poll里面
+	  //检测到的有事件的SOCKT pendings队列里面的事件进行处理
     }
   while (expect_true (
     activecnt
@@ -3556,7 +3501,7 @@ ev_stop (EV_P_ W w)
 
 void noinline
 ev_io_start (EV_P_ ev_io *w) EV_THROW
-{
+{//记录这个句柄的事件，实际上还没有加入epoll的, 只是记录到了fdchanges里面
   int fd = w->fd;
 
   //检查是否已经开启了
@@ -3569,12 +3514,13 @@ ev_io_start (EV_P_ ev_io *w) EV_THROW
   EV_FREQUENT_CHECK;
 
   ev_start (EV_A_ (W)w, 1);
-  array_needsize (ANFD, anfds, anfdmax, fd + 1, array_init_zero);
-  wlist_add (&anfds[fd].head, (WL)w);
+  array_needsize (ANFD, anfds, anfdmax, fd + 1, array_init_zero);//为新的句柄准备空间，放到(loop)->anfds里面去的
+  wlist_add (&anfds[fd].head, (WL)w);//将W插入到anfds[fd]的头部，挂一个未处理事件,比如增加，删除啥的
 
   /* common bug, apparently */
   assert (("libev: ev_io_start called with corrupted watcher", ((WL)w)->next != (WL)w));
 
+  //标记这个句柄的改动到fdchanges，后面run的时候会处理加入epoll的
   fd_change (EV_A_ fd, w->events & EV__IOFDSET | EV_ANFD_REIFY);
   w->events &= ~EV__IOFDSET;
 
