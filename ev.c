@@ -2447,23 +2447,8 @@ childcb (EV_P_ ev_signal *sw, int revents)
 
 /*****************************************************************************/
 
-#if EV_USE_IOCP
-# include "ev_iocp.c"
-#endif
-#if EV_USE_PORT
-# include "ev_port.c"
-#endif
-#if EV_USE_KQUEUE
-# include "ev_kqueue.c"
-#endif
 #if EV_USE_EPOLL
 # include "ev_epoll.c"
-#endif
-#if EV_USE_POLL
-# include "ev_poll.c"
-#endif
-#if EV_USE_SELECT
-# include "ev_select.c"
 #endif
 
 int ecb_cold
