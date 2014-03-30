@@ -40,11 +40,7 @@
 #ifndef EV_H_
 #define EV_H_
 
-#ifdef __cplusplus
-# define EV_CPP(x) x
-#else
 # define EV_CPP(x)
-#endif
 
 #define EV_THROW EV_CPP(throw())
 
@@ -698,7 +694,9 @@ EV_API_DECL void ev_resume  (EV_P) EV_THROW;
 #define ev_cleanup_set(ev)                   /* nop, yes, this is a serious in-joke */
 #define ev_async_set(ev)                     /* nop, yes, this is a serious in-joke */
 
+//设置毁掉函数，初始化fd,events字段
 #define ev_io_init(ev,cb,fd,events)          do { ev_init ((ev), (cb)); ev_io_set ((ev),(fd),(events)); } while (0)
+
 #define ev_timer_init(ev,cb,after,repeat)    do { ev_init ((ev), (cb)); ev_timer_set ((ev),(after),(repeat)); } while (0)
 #define ev_periodic_init(ev,cb,ofs,ival,rcb) do { ev_init ((ev), (cb)); ev_periodic_set ((ev),(ofs),(ival),(rcb)); } while (0)
 #define ev_signal_init(ev,cb,signum)         do { ev_init ((ev), (cb)); ev_signal_set ((ev), (signum)); } while (0)

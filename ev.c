@@ -745,9 +745,7 @@ struct signalfd_siginfo
 
 /*****************************************************************************/
 
-#if __cplusplus
-  #define ecb_inline static inline
-#elif ECB_GCC_VERSION(2,5)
+#if   ECB_GCC_VERSION(2,5)
   #define ecb_inline static __inline__
 #elif ECB_C99
   #define ecb_inline static inline
@@ -1043,21 +1041,8 @@ ecb_inline ecb_bool ecb_little_endian (void) { return ecb_byteorder_helper () ==
   #define ecb_mod(m,n) ((m) < 0 ? ((n) - 1 - ((-1 - (m)) % (n))) : ((m) % (n)))
 #endif
 
-#if __cplusplus
-  template<typename T>
-  static inline T ecb_div_rd (T val, T div)
-  {
-    return val < 0 ? - ((-val + div - 1) / div) : (val          ) / div;
-  }
-  template<typename T>
-  static inline T ecb_div_ru (T val, T div)
-  {
-    return val < 0 ? - ((-val          ) / div) : (val + div - 1) / div;
-  }
-#else
   #define ecb_div_rd(val,div) ((val) < 0 ? - ((-(val) + (div) - 1) / (div)) : ((val)            ) / (div))
   #define ecb_div_ru(val,div) ((val) < 0 ? - ((-(val)            ) / (div)) : ((val) + (div) - 1) / (div))
-#endif
 
 #if ecb_cplusplus_does_not_suck
   /* does not work for local types (http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2008/n2657.htm) */
@@ -1075,21 +1060,7 @@ ecb_inline ecb_bool ecb_little_endian (void) { return ecb_byteorder_helper () ==
 
 /* basically, everything uses "ieee pure-endian" floating point numbers */
 /* the only noteworthy exception is ancient armle, which uses order 43218765 */
-#if 0 \
-    || __i386 || __i386__ \
-    || __amd64 || __amd64__ || __x86_64 || __x86_64__ \
-    || __powerpc__ || __ppc__ || __powerpc64__ || __ppc64__ \
-    || defined __arm__ && defined __ARM_EABI__ \
-    || defined __s390__ || defined __s390x__ \
-    || defined __mips__ \
-    || defined __alpha__ \
-    || defined __hppa__ \
-    || defined __ia64__ \
-    || defined __m68k__ \
-    || defined __m88k__ \
-    || defined __sh__ \
-    || defined _M_IX86 || defined _M_AMD64 || defined _M_IA64 \
-    || (defined __arm__ && (defined __ARM_EABI__ || defined __EABI__ || defined __VFP_FP__ || defined _WIN32_WCE || defined __ANDROID__))
+#if  __i386 || __i386__     || __amd64 || __amd64__ || __x86_64 || __x86_64__     || __powerpc__ || __ppc__ || __powerpc64__ || __ppc64__     || defined __arm__ && defined __ARM_EABI__     || defined __s390__ || defined __s390x__     || defined __mips__     || defined __alpha__     || defined __hppa__     || defined __ia64__     || defined __m68k__     || defined __m88k__     || defined __sh__     || defined _M_IX86 || defined _M_AMD64 || defined _M_IA64     || (defined __arm__ && (defined __ARM_EABI__ || defined __EABI__ || defined __VFP_FP__ || defined _WIN32_WCE || defined __ANDROID__))
   #define ECB_STDFP 1
   #include <string.h> /* for memcpy */
 #else
@@ -3588,6 +3559,7 @@ ev_io_start (EV_P_ ev_io *w) EV_THROW
 {
   int fd = w->fd;
 
+  //检查是否已经开启了
   if (expect_false (ev_is_active (w)))
     return;
 

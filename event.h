@@ -56,9 +56,6 @@
 # define EV_TIMEOUT EV_TIMER
 #endif
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 /* we need sys/time.h for struct timeval only */
 #if !defined (WIN32) || defined (__MINGW32__)
@@ -169,9 +166,6 @@ int event_base_priority_init (struct event_base *base, int fd);
 /* next line is different in the libevent+libev version */
 /*libevent-include*/
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif
 
